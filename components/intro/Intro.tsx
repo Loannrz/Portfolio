@@ -4,22 +4,31 @@ import { useEffect, useRef, useState } from 'react'
 import { gsap } from '@/lib/gsap'
 import { BlobShape, ArcShape, CircleShape, OrbitShape, SparkShape } from '@/components/shapes'
 
-const LETTERS = 'BIENVENUE'.split('')
+export type IntroProps = {
+  onComplete: () => void
+  /** Mot affiché lettre par lettre (ex. BIENVENUE, SHOWROOM) */
+  headline?: string
+  subtitle?: string
+}
 
-export default function Intro({ onComplete }: { onComplete: () => void }) {
+export default function Intro({
+  onComplete,
+  headline = 'BIENVENUE',
+  subtitle = 'OctoVisual — Creative Visual Studio',
+}: IntroProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const lettersRef = useRef<HTMLSpanElement[]>([])
   const subtitleRef = useRef<HTMLParagraphElement>(null)
   const wipeRef = useRef<HTMLDivElement>(null)
-  const skipRef = useRef<HTMLButtonElement>(null)
   const tlRef = useRef<gsap.core.Timeline | null>(null)
 
+  const letters = headline.split('')
   const [visible, setVisible] = useState(true)
 
   const runAnimation = () => {
+    const letterEls = lettersRef.current.filter(Boolean)
     const tl = gsap.timeline({
       onComplete: () => {
-        // Wipe transition: diagonal orange → cream
         gsap.to(wipeRef.current, {
           scaleX: 1,
           duration: 0.8,
@@ -49,9 +58,8 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
 
     tlRef.current = tl
 
-    // Letters: blur → net, stagger
     tl.fromTo(
-      lettersRef.current,
+      letterEls,
       {
         opacity: 0,
         filter: 'blur(30px)',
@@ -69,7 +77,6 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
       }
     )
 
-    // Subtitle fade in
     tl.fromTo(
       subtitleRef.current,
       { opacity: 0, y: 20, filter: 'blur(8px)' },
@@ -77,12 +84,10 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
       '-=0.4'
     )
 
-    // Hold
     tl.to({}, { duration: 1.2 })
 
-    // Letters: zoom cinematic explosion
     tl.to(
-      lettersRef.current,
+      letterEls,
       {
         scale: 2.5,
         opacity: 0,
@@ -112,13 +117,12 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
       return
     }
 
-    // Init wipe
     gsap.set(wipeRef.current, { scaleX: 0, transformOrigin: 'left center' })
 
     const timer = setTimeout(runAnimation, 200)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [headline])
 
   const handleSkip = () => {
     tlRef.current?.kill()
@@ -141,7 +145,6 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
       className="fixed inset-0 z-[9990] flex flex-col items-center justify-center overflow-hidden"
       style={{ backgroundColor: 'var(--cream)' }}
     >
-      {/* Background shapes */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
         <div className="absolute -top-20 -left-20 animate-float" style={{ animationDelay: '0s' }}>
           <BlobShape color="#E7C9A9" size={480} opacity={0.5} rotation={-15} />
@@ -163,14 +166,13 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
         </div>
       </div>
 
-      {/* Main title */}
       <div
         className="relative z-10 flex gap-[0.04em] select-none overflow-hidden px-4"
-        aria-label="BIENVENUE"
+        aria-label={headline}
       >
-        {LETTERS.map((letter, i) => (
+        {letters.map((letter, i) => (
           <span
-            key={i}
+            key={`${headline}-${i}`}
             ref={(el) => {
               if (el) lettersRef.current[i] = el
             }}
@@ -188,18 +190,16 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
         ))}
       </div>
 
-      {/* Subtitle */}
       <p
         ref={subtitleRef}
-        className="relative z-10 mt-6 t-label text-graphite tracking-[0.2em]"
+        className="relative z-10 mt-6 t-label text-graphite tracking-[0.2em] text-center px-6 max-w-lg"
         style={{ opacity: 0 }}
       >
-        OctoVisual — Creative Visual Studio
+        {subtitle}
       </p>
 
-      {/* Skip button */}
       <button
-        ref={skipRef}
+        type="button"
         onClick={handleSkip}
         className="absolute bottom-8 right-10 t-label text-ink/40 hover:text-ink/70 transition-colors duration-300"
         data-cursor="link"
@@ -207,7 +207,6 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
         SKIP →
       </button>
 
-      {/* Wipe overlay */}
       <div
         ref={wipeRef}
         className="absolute inset-0 z-20 pointer-events-none"

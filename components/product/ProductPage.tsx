@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { gsap, ScrollTrigger } from '@/lib/gsap'
 import Link from 'next/link'
+import { getLenis } from '@/lib/lenis'
 
 // ─── Data ────────────────────────────────────────────────────────────────────────
 
@@ -103,14 +104,16 @@ const SERVICES = [
 
 function PackCard({
   pack,
-  index,
+  index: _index,
   cardRef,
   onOpen,
+  allowInteraction = true,
 }: {
   pack: Pack
   index: number
   cardRef: (el: HTMLDivElement | null) => void
   onOpen: (pack: Pack) => void
+  allowInteraction?: boolean
 }) {
   const innerRef = useRef<HTMLDivElement>(null)
 
@@ -143,10 +146,14 @@ function PackCard({
     <div
       ref={cardRef}
       className="absolute left-1/2 top-1/2 will-change-transform"
-      style={{ transform: 'translate(-50%, -50%)', transformStyle: 'preserve-3d' }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onClick={() => onOpen(pack)}
+      style={{
+        transformStyle: 'preserve-3d',
+        transformOrigin: '50% 50%',
+        pointerEvents: allowInteraction ? 'auto' : 'none',
+      }}
+      onMouseMove={allowInteraction ? handleMouseMove : undefined}
+      onMouseLeave={allowInteraction ? handleMouseLeave : undefined}
+      onClick={allowInteraction ? () => onOpen(pack) : undefined}
     >
       <div
         ref={innerRef}
@@ -156,8 +163,11 @@ function PackCard({
           height: 'min(680px, 72vh)',
           background: pack.bg,
           borderRadius: '12px',
-          border: `1px solid ${pack.accent}22`,
-          boxShadow: `0 0 80px ${pack.accent}18, 0 40px 120px rgba(0,0,0,0.8), inset 0 1px 0 ${pack.accent}18`,
+          border: allowInteraction ? `1px solid ${pack.accent}55` : `1px solid ${pack.accent}22`,
+          boxShadow: allowInteraction
+            ? `0 0 0 1px rgba(248, 244, 238, 0.12), 0 0 96px ${pack.accent}26, 0 40px 120px rgba(0,0,0,0.82), inset 0 1px 0 ${pack.accent}28`
+            : `0 0 80px ${pack.accent}18, 0 40px 120px rgba(0,0,0,0.8), inset 0 1px 0 ${pack.accent}18`,
+          transition: 'border-color 0.55s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.55s cubic-bezier(0.16, 1, 0.3, 1)',
           transformStyle: 'preserve-3d',
           cursor: 'none',
           position: 'relative',
@@ -611,19 +621,11 @@ function PackDetail({ pack, onClose }: { pack: Pack; onClose: () => void }) {
 
 function Configurateur() {
   const [selected, setSelected] = useState<string[]>([])
-  const [sent, setSent] = useState(false)
 
   const toggleService = (id: string) => {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     )
-  }
-
-  const buildMailto = () => {
-    const list = selected
-      .map((id) => SERVICES.find((s) => s.id === id)?.label ?? id)
-      .join(', ')
-    return `mailto:contact@octovisual.fr?subject=Demande%20personnalisée%20OctoVisual&body=Bonjour,%0A%0AJe%20suis%20intéressé(e)%20par%20les%20services%20suivants%20:%20${encodeURIComponent(list)}.%0A%0AMerci%20de%20me%20contacter%20pour%20établir%20un%20devis.`
   }
 
   return (
@@ -724,7 +726,9 @@ function Configurateur() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <a
-                href={buildMailto()}
+                href="https://www.instagram.com/octo.visuals/"
+                target="_blank"
+                rel="noopener noreferrer"
                 data-cursor="hover"
                 style={{
                   display: 'inline-flex',
@@ -743,7 +747,7 @@ function Configurateur() {
                   cursor: 'none',
                 }}
               >
-                Envoyer ma demande
+                Contacter sur Instagram
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                   <path d="M2 14L14 2M14 2H6M14 2V10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -792,9 +796,35 @@ export default function ProductPage() {
   const heroRef = useRef<HTMLElement>(null)
   const tunnelRef = useRef<HTMLElement>(null)
   const perspRef = useRef<HTMLDivElement>(null)
-  const cardRefs = useRef<HTMLDivElement[]>([])
+  const tunnelCardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const mobileCardRefs = useRef<(HTMLDivElement | null)[]>([])
   const bgRef = useRef<HTMLDivElement>(null)
+  const tunnelSTRef = useRef<ScrollTrigger | null>(null)
+  const lastTunnelIdxRef = useRef(-1)
   const [activePack, setActivePack] = useState<Pack | null>(null)
+  const [activeTunnelIdx, setActiveTunnelIdx] = useState(0)
+
+  const scrollToTunnelPack = useCallback((index: number) => {
+    const section = tunnelRef.current
+    const st = tunnelSTRef.current
+    if (!section) return
+    const denom = Math.max(1, PACKS.length - 1)
+    const clamped = Math.max(0, Math.min(PACKS.length - 1, index))
+    const progress = clamped / denom
+    let y: number
+    if (st && typeof st.start === 'number' && typeof st.end === 'number') {
+      y = st.start + progress * (st.end - st.start)
+    } else {
+      const pinHeight = PACKS.length * window.innerHeight * 1.3
+      y = section.offsetTop + progress * pinHeight
+    }
+    const lenis = getLenis()
+    if (lenis) {
+      lenis.scrollTo(y, { duration: 1.35 })
+    } else {
+      window.scrollTo({ top: y, behavior: 'smooth' })
+    }
+  }, [])
 
   /* ── Hero entrance ─────────────────────────────── */
   useEffect(() => {
@@ -820,10 +850,17 @@ export default function ProductPage() {
     mm.add('(min-width: 768px) and (prefers-reduced-motion: no-preference)', () => {
       const PIN_HEIGHT = PACKS.length * window.innerHeight * 1.3
 
-      /* Initial z positions */
-      cardRefs.current.forEach((card, i) => {
+      tunnelCardRefs.current.forEach((card, i) => {
         if (!card) return
-        gsap.set(card, { z: i === 0 ? 0 : -(i * 700), opacity: i === 0 ? 1 : 0, scale: 1, rotationY: 0 })
+        gsap.set(card, {
+          xPercent: -50,
+          yPercent: -50,
+          transformOrigin: '50% 50%',
+          z: i === 0 ? 0 : -(i * 700),
+          opacity: i === 0 ? 1 : 0,
+          scale: 1,
+          rotationY: 0,
+        })
       })
 
       const st = ScrollTrigger.create({
@@ -836,7 +873,7 @@ export default function ProductPage() {
         onUpdate: (self) => {
           const totalPacks = PACKS.length
           PACKS.forEach((_, i) => {
-            const card = cardRefs.current[i]
+            const card = tunnelCardRefs.current[i]
             if (!card) return
 
             /* Progress quand ce pack est "à l'honneur" */
@@ -874,6 +911,9 @@ export default function ProductPage() {
             }
 
             gsap.set(card, {
+              xPercent: -50,
+              yPercent: -50,
+              transformOrigin: '50% 50%',
               z,
               scale,
               opacity,
@@ -882,26 +922,36 @@ export default function ProductPage() {
             })
           })
 
+          const hi = Math.round(self.progress * (PACKS.length - 1))
+          const idx = Math.min(Math.max(0, hi), PACKS.length - 1)
+          if (idx !== lastTunnelIdxRef.current) {
+            lastTunnelIdxRef.current = idx
+            setActiveTunnelIdx(idx)
+          }
+
           /* Background accent color transition */
           if (bgRef.current) {
-            const idx = Math.round(self.progress * (PACKS.length - 1))
-            const pack = PACKS[Math.min(idx, PACKS.length - 1)]
+            const pack = PACKS[idx]
             bgRef.current.style.background = `radial-gradient(ellipse at 50% 45%, ${pack.accent}12 0%, transparent 70%)`
           }
         },
       })
 
+      tunnelSTRef.current = st
+
       return () => {
+        tunnelSTRef.current = null
         st.kill()
-        cardRefs.current.forEach((card) => {
+        lastTunnelIdxRef.current = -1
+        tunnelCardRefs.current.forEach((card) => {
           if (card) gsap.set(card, { clearProps: 'all' })
         })
       }
     })
 
-    /* Mobile: fade-in par carte au scroll */
+    /* Mobile: fade-in par carte au scroll — refs séparées pour ne pas écraser le tunnel desktop */
     mm.add('(max-width: 767px) and (prefers-reduced-motion: no-preference)', () => {
-      cardRefs.current.forEach((card) => {
+      mobileCardRefs.current.forEach((card) => {
         if (!card) return
         gsap.set(card, { opacity: 0, y: 60 })
         ScrollTrigger.create({
@@ -1042,8 +1092,9 @@ export default function ProductPage() {
                 key={pack.id}
                 pack={pack}
                 index={i}
-                cardRef={(el) => { cardRefs.current[i] = el! }}
+                cardRef={(el) => { tunnelCardRefs.current[i] = el }}
                 onOpen={setActivePack}
+                allowInteraction={activeTunnelIdx === i}
               />
             ))}
           </div>
@@ -1053,7 +1104,7 @@ export default function ProductPage() {
             {PACKS.map((pack, i) => (
               <div
                 key={pack.id}
-                ref={(el) => { cardRefs.current[i] = el! }}
+                ref={(el) => { mobileCardRefs.current[i] = el }}
                 onClick={() => setActivePack(pack)}
                 data-cursor="hover"
                 style={{
@@ -1086,22 +1137,123 @@ export default function ProductPage() {
           </div>
         </div>
 
-        {/* Pack counter (desktop) */}
+        {/* Navigation packs desktop — profondeur + accès direct */}
         <div
-          className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 items-center gap-2 z-20"
-          style={{ fontFamily: 'var(--font-body)', fontSize: '0.5rem', letterSpacing: '0.16em', color: 'rgba(248,244,238,0.25)', textTransform: 'uppercase' }}
+          className="hidden md:flex absolute bottom-6 left-0 right-0 z-30 flex-col items-center gap-4 px-6 pointer-events-none"
         >
-          {PACKS.map((_, i) => (
-            <div
-              key={i}
+          <p
+            className="pointer-events-none text-center uppercase tracking-[0.28em]"
+            style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: '0.48rem',
+              color: 'rgba(248,244,238,0.35)',
+            }}
+          >
+            Parcourez les packs · scroll ou clic
+          </p>
+          <div className="flex items-center gap-5 pointer-events-auto">
+            <button
+              type="button"
+              data-cursor="hover"
+              onClick={() => scrollToTunnelPack(activeTunnelIdx - 1)}
+              disabled={activeTunnelIdx <= 0}
+              aria-label="Pack précédent"
+              className="disabled:opacity-20 disabled:pointer-events-none transition-opacity"
               style={{
-                width: '20px',
-                height: '1px',
-                backgroundColor: 'rgba(248,244,238,0.2)',
-                borderRadius: '1px',
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                border: '1px solid rgba(248,244,238,0.12)',
+                backgroundColor: 'rgba(248,244,238,0.04)',
+                color: '#F8F4EE',
+                fontFamily: 'var(--font-body)',
+                fontSize: '0.85rem',
+                cursor: 'none',
               }}
-            />
-          ))}
+            >
+              ←
+            </button>
+
+            <div className="flex items-center gap-2 flex-wrap justify-center max-w-[min(720px,90vw)]">
+              {PACKS.map((pack, i) => {
+                const active = i === activeTunnelIdx
+                return (
+                  <button
+                    key={pack.id}
+                    type="button"
+                    data-cursor="hover"
+                    onClick={() => scrollToTunnelPack(i)}
+                    aria-label={`Pack ${pack.number} ${pack.title}`}
+                    aria-current={active ? 'step' : undefined}
+                    className="group flex flex-col items-center gap-1 transition-all duration-500"
+                    style={{
+                      cursor: 'none',
+                      minWidth: '52px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: '0.42rem',
+                        letterSpacing: '0.14em',
+                        color: active ? pack.accent : 'rgba(248,244,238,0.22)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {pack.number}
+                    </span>
+                    <span
+                      style={{
+                        height: active ? '4px' : '2px',
+                        width: active ? '48px' : '22px',
+                        borderRadius: '2px',
+                        backgroundColor: active ? pack.accent : 'rgba(248,244,238,0.18)',
+                        boxShadow: active ? `0 0 16px ${pack.accent}44` : 'none',
+                        transition: 'all 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+                        transform: active ? 'translateZ(0) scaleX(1)' : 'scaleX(1)',
+                      }}
+                    />
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              data-cursor="hover"
+              onClick={() => scrollToTunnelPack(activeTunnelIdx + 1)}
+              disabled={activeTunnelIdx >= PACKS.length - 1}
+              aria-label="Pack suivant"
+              className="disabled:opacity-20 disabled:pointer-events-none transition-opacity"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                border: '1px solid rgba(248,244,238,0.12)',
+                backgroundColor: 'rgba(248,244,238,0.04)',
+                color: '#F8F4EE',
+                fontFamily: 'var(--font-body)',
+                fontSize: '0.85rem',
+                cursor: 'none',
+              }}
+            >
+              →
+            </button>
+          </div>
+
+          <p
+            className="pointer-events-none text-center max-w-md px-4"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(0.85rem, 1.5vw, 1.05rem)',
+              fontWeight: 600,
+              letterSpacing: '-0.02em',
+              color: '#F8F4EE',
+              opacity: 0.85,
+            }}
+          >
+            {PACKS[activeTunnelIdx]?.title}
+          </p>
         </div>
       </section>
 

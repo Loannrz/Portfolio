@@ -5,11 +5,12 @@ import { gsap } from '@/lib/gsap'
 import { WaveShape, LineShape } from '@/components/shapes'
 
 const NAV_LINKS = [
-  { label: 'Travaux', href: '#gallery', num: '01' },
-  { label: 'Vidéo', href: '#videos', num: '02' },
-  { label: 'Studio', href: '#about', num: '03' },
-  { label: 'Contact', href: '#contact', num: '04' },
-  { label: 'Showroom', href: '/product', num: '05' },
+  { label: 'Accueil', href: 'https://octovisuals.fr/', num: '01' },
+  { label: 'Showroom', href: '/product', num: '02' },
+  { label: 'Travaux', href: '#gallery', num: '03' },
+  { label: 'Vidéo', href: '#videos', num: '04' },
+  { label: 'Studio', href: '#about', num: '05' },
+  { label: 'Contact', href: '#contact', num: '06' },
 ]
 
 const SOCIAL_LINKS = [

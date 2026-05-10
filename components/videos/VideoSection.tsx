@@ -79,7 +79,8 @@ export default function VideoSection() {
   const cardRefs    = useRef<(HTMLDivElement | null)[]>([])
   const videoElRefs = useRef<(HTMLVideoElement | null)[]>([])
 
-  const nearViewport = useRunWhenNearViewport(sectionRef, '380px')
+  /* Marge trop grande → ScrollTrigger se monte alors que le portfolio est encore à l’écran (surtout tablette) */
+  const nearViewport = useRunWhenNearViewport(sectionRef, '48px')
 
   /* Facteur d'échelle viewport : réduit les offsets x/y et largeurs sur mobile */
   const [vpScale, setVpScale] = useState(1)
@@ -151,13 +152,17 @@ export default function VideoSection() {
     })
 
     /* ── Pin + traversée du tunnel 3D ── */
-    const pinDist = window.innerWidth < 768 ? 4 : PIN_DISTANCE
+    const getPinDist = () =>
+      typeof window !== 'undefined' && window.innerWidth < 768 ? 4 : PIN_DISTANCE
+
     const st = ScrollTrigger.create({
       trigger: section,
       start: 'top top',
-      end: `+=${window.innerHeight * pinDist}`,
+      end: () => `+=${window.innerHeight * getPinDist()}`,
       pin: true,
       pinSpacing: true,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
       scrub: 1,
       onUpdate: (self) => {
         const p       = self.progress
@@ -211,7 +216,23 @@ export default function VideoSection() {
       },
     })
 
+    const refreshST = () => {
+      ScrollTrigger.refresh()
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(refreshST)
+    })
+
+    let resizeT: ReturnType<typeof setTimeout>
+    const onResize = () => {
+      clearTimeout(resizeT)
+      resizeT = setTimeout(refreshST, 120)
+    }
+    window.addEventListener('resize', onResize)
+
     return () => {
+      window.removeEventListener('resize', onResize)
+      clearTimeout(resizeT)
       st.kill()
       videoIO.disconnect()
       videoElRefs.current.forEach((v) => v?.pause())
@@ -225,7 +246,7 @@ export default function VideoSection() {
     <section
       ref={sectionRef}
       id="videos"
-      className="relative overflow-hidden"
+      className="relative z-[2] overflow-hidden"
       style={{ height: '100vh', backgroundColor: '#050505' }}
     >
       {/* ── Champ d'étoiles ── */}

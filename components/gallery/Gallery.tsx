@@ -26,7 +26,7 @@ export default function Gallery() {
   const overlayRef    = useRef<HTMLDivElement>(null)
   const overlayLabelRef = useRef<HTMLDivElement>(null)
 
-  const nearViewport = useRunWhenNearViewport(sectionRef, '400px')
+  const nearViewport = useRunWhenNearViewport(sectionRef, '120px')
 
   const [activeCategory, setActiveCategory] = useState<Category>('TOUS')
   const [activeIndex, setActiveIndex]       = useState(0)
@@ -232,7 +232,7 @@ export default function Gallery() {
     <section
       ref={sectionRef}
       id="gallery"
-      className="relative"
+      className="relative z-[12]"
       style={{
         height: '100vh',
         backgroundColor: current?.accent ? `${current.accent}09` : 'var(--cream-secondary)',
