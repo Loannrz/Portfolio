@@ -89,6 +89,8 @@ const PACKS: Pack[] = [
   },
 ]
 
+const OCTOVISUAL_INSTAGRAM = 'https://www.instagram.com/octo.visuals/'
+
 const SERVICES = [
   { id: 'affiche', label: 'Affiche', icon: '◈' },
   { id: 'logo', label: 'Logo', icon: '◉' },
@@ -557,8 +559,10 @@ function PackDetail({ pack, onClose }: { pack: Pack; onClose: () => void }) {
 
           {/* CTA */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/#contact"
+            <a
+              href={OCTOVISUAL_INSTAGRAM}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={handleClose}
               data-cursor="hover"
               style={{
@@ -584,9 +588,9 @@ function PackDetail({ pack, onClose }: { pack: Pack; onClose: () => void }) {
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                 <path d="M2 14L14 2M14 2H6M14 2V10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-            </Link>
+            </a>
             <a
-              href="https://www.instagram.com/octo.visuals/"
+              href={OCTOVISUAL_INSTAGRAM}
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleClose}
@@ -726,7 +730,7 @@ function Configurateur() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <a
-                href="https://www.instagram.com/octo.visuals/"
+                href={OCTOVISUAL_INSTAGRAM}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-cursor="hover"
@@ -1288,7 +1292,7 @@ export default function ProductPage() {
           Parlons de<br />votre projet.
         </h2>
         <Link
-          href="/#contact"
+          href={OCTOVISUAL_INSTAGRAM}
           data-cursor="hover"
           style={{
             display: 'inline-flex',

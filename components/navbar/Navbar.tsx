@@ -6,11 +6,10 @@ import { WaveShape, LineShape } from '@/components/shapes'
 
 const NAV_LINKS = [
   { label: 'Accueil', href: 'https://octovisuals.fr/', num: '01' },
-  { label: 'Showroom', href: '/product', num: '02' },
-  { label: 'Travaux', href: '#gallery', num: '03' },
-  { label: 'Vidéo', href: '#videos', num: '04' },
-  { label: 'Studio', href: '#about', num: '05' },
-  { label: 'Contact', href: '#contact', num: '06' },
+  { label: 'Travaux', href: '#gallery', num: '02' },
+  { label: 'Vidéo', href: '#videos', num: '03' },
+  { label: 'Contact', href: '#contact', num: '04' },
+  { label: 'Showroom', href: '/product', num: '05' },
 ]
 
 const SOCIAL_LINKS = [
