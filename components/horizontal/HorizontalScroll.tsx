@@ -225,10 +225,10 @@ export default function HorizontalScroll() {
             {/* Contenu */}
             <div className="relative z-10 flex flex-col justify-between h-full w-full md:w-1/2 px-7 md:px-20 py-14 md:py-16">
               <div className="slide-label flex items-center justify-between">
-                <span className="t-label tracking-[0.18em]" style={{ color: slide.accent }}>
+                <span className="t-label tracking-[0.18em] max-md:!text-[0.58rem] max-md:!tracking-[0.14em]" style={{ color: slide.accent }}>
                   {slide.category}
                 </span>
-                <span className="t-label text-white/50 md:text-ink/25 tabular-nums">
+                <span className="t-label text-white/50 md:text-ink/25 tabular-nums max-md:!text-[0.52rem]">
                   {slide.index} / {SLIDES.length.toString().padStart(2, '0')}
                 </span>
               </div>
@@ -236,21 +236,22 @@ export default function HorizontalScroll() {
               <div className="flex-1 flex items-center">
                 <h2
                   ref={(el) => { if (el) headlineRefs.current[i] = el }}
-                  className="font-display font-bold text-white md:text-ink tracking-[-0.04em] leading-[0.9] whitespace-pre-line"
-                  style={{ fontSize: 'clamp(3rem, 7.5vw, 9rem)' }}
+                  className="font-display font-bold text-white md:text-ink tracking-[-0.04em] leading-[0.9] whitespace-pre-line max-md:leading-[0.93] text-[clamp(1.65rem,4.2vw+0.9rem,3.35rem)] md:text-[clamp(3rem,7.5vw,9rem)]"
                 >
                   {slide.headline}
                 </h2>
               </div>
 
-              <div className="flex flex-col gap-6">
-                <p className="slide-body t-body text-white/75 md:text-ink/55 max-w-xs leading-relaxed">{slide.sub}</p>
+              <div className="flex flex-col gap-4 md:gap-6">
+                <p className="slide-body t-body text-white/75 md:text-ink/55 max-w-xs leading-relaxed max-md:!text-[clamp(0.78rem,2.8vw+0.35rem,0.95rem)] max-md:!leading-snug">
+                  {slide.sub}
+                </p>
                 <div className="slide-cta flex items-center gap-3 group">
                   <span
                     className="w-8 h-px transition-all duration-500 group-hover:w-14"
                     style={{ backgroundColor: slide.accent }}
                   />
-                  <a href="#gallery" className="t-label tracking-[0.12em] transition-colors duration-300" style={{ color: slide.accent }} data-cursor="hover">
+                  <a href="#gallery" className="t-label tracking-[0.12em] transition-colors duration-300 max-md:!text-[0.58rem]" style={{ color: slide.accent }} data-cursor="hover">
                     Voir les projets
                   </a>
                 </div>

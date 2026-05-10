@@ -86,7 +86,12 @@ export default function VideoSection() {
   const [vpScale, setVpScale] = useState(1)
 
   useEffect(() => {
-    setVpScale(Math.min(1, Math.max(0.28, window.innerWidth / 1400)))
+    const update = () => {
+      setVpScale(Math.min(1, Math.max(0.28, window.innerWidth / 1400)))
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
   }, [])
 
   useEffect(() => {
@@ -312,7 +317,7 @@ export default function VideoSection() {
           ref={titleRef}
           className="font-display font-bold tracking-[-0.04em] leading-[0.9]"
           style={{
-            fontSize: 'clamp(3rem, 8vw, 8rem)',
+            fontSize: 'clamp(1.85rem, 5vw + 1rem, 8rem)',
             color: '#F8F4EE',
             opacity: 0,
           }}
@@ -402,14 +407,14 @@ export default function VideoSection() {
                 />
 
                 {/* Badge catégorie */}
-                <div className="absolute top-3 left-3">
+                <div className="absolute top-2 left-2 md:top-3 md:left-3">
                   <span
                     style={{
                       fontFamily: 'var(--font-body)',
-                      fontSize: '0.5rem',
+                      fontSize: 'clamp(0.3rem, 0.2rem + 1vw, 0.5rem)',
                       letterSpacing: '0.12em',
                       textTransform: 'uppercase',
-                      padding: '3px 8px',
+                      padding: '2px 6px',
                       backgroundColor: vid.accent,
                       color: '#fff',
                       borderRadius: '4px',
@@ -421,11 +426,11 @@ export default function VideoSection() {
                 </div>
 
                 {/* Titre + client */}
-                <div className="absolute bottom-0 left-0 right-0 p-3.5">
+                <div className="absolute bottom-0 left-0 right-0 p-2 md:p-3.5">
                   <p
                     style={{
                       fontFamily: 'var(--font-display)',
-                      fontSize: '0.75rem',
+                      fontSize: 'clamp(0.44rem, 0.32rem + 1.45vw, 0.75rem)',
                       fontWeight: 600,
                       letterSpacing: '-0.01em',
                       color: '#F8F4EE',
@@ -437,9 +442,9 @@ export default function VideoSection() {
                   <p
                     style={{
                       fontFamily: 'var(--font-body)',
-                      fontSize: '0.54rem',
+                      fontSize: 'clamp(0.34rem, 0.26rem + 1.05vw, 0.54rem)',
                       color: 'rgba(248,244,238,0.45)',
-                      marginTop: '3px',
+                      marginTop: '2px',
                       letterSpacing: '0.04em',
                     }}
                   >
