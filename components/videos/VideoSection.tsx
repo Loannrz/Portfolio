@@ -70,11 +70,11 @@ const PIN_DISTANCE = 6
 /** Moins de particules en prod = moins de travail canvas sur la même frame que le tunnel */
 const STARFIELD_COUNT = IS_DEV ? 64 : 88
 
-/** Ne resynchroniser hydrate/play vidéo qu’après ce délai (scroll : opacités restent fluides à chaque frame) */
-const VIDEO_SYNC_MS = 110
+/** Sync vidéo « normal » ; en rafale (gros Δprogress) on force à chaque frame */
+const VIDEO_SYNC_MS = 90
 
-/** scrub GSAP : plus bas = moins d’inertie à recalculer, scroll plus réactif */
-const SCRUB_LAG_SEC = 0.22
+/** Si |Δprogress| > seuil entre deux onUpdate : on ignore l’epsilon d’opacité + sync vidéo */
+const SCROLL_BURST_PROGRESS = 0.017
 
 /** Opacité min. pour commencer à charger la source (évite 20 flux réseau + decode d’un coup) */
 const HYDRATE_OP_THRESHOLD = 0.07
@@ -106,6 +106,7 @@ export default function VideoSection() {
   const lastCameraZRef = useRef(0)
   const lastCardOpRef = useRef<number[]>([])
   const lastVideoSyncRef = useRef(0)
+  const lastPinProgressRef = useRef<number>(-1)
 
   /* Marge trop grande → ScrollTrigger se monte alors que le portfolio est encore à l’écran (surtout tablette) */
   const nearViewport = useRunWhenNearViewport(sectionRef, '48px')
@@ -157,7 +158,11 @@ export default function VideoSection() {
     const label   = labelRef.current
     if (!section || !camera || !title || !label) return
 
-    const hydrateAndSyncPlayback = (cameraZ: number, forceVideo = false) => {
+    const hydrateAndSyncPlayback = (
+      cameraZ: number,
+      forceVideo = false,
+      scrollBurst = false,
+    ) => {
       lastCameraZRef.current = cameraZ
       const maxPlay = maxConcurrentVideos()
       const now = typeof performance !== 'undefined' ? performance.now() : 0
@@ -174,7 +179,11 @@ export default function VideoSection() {
         ops[i] = op
 
         const prev = lastOps[i]
-        if (prev === undefined || Math.abs(op - prev) > 0.003) {
+        const mustPaint =
+          scrollBurst ||
+          prev === undefined ||
+          Math.abs(op - prev) > 0.003
+        if (mustPaint) {
           lastOps[i] = op
           card.style.opacity = String(op)
           const pe = op > 0.4 ? 'auto' : 'none'
@@ -183,7 +192,9 @@ export default function VideoSection() {
       }
 
       const shouldSyncVideo =
-        forceVideo || now - lastVideoSyncRef.current >= VIDEO_SYNC_MS
+        forceVideo ||
+        scrollBurst ||
+        now - lastVideoSyncRef.current >= VIDEO_SYNC_MS
 
       if (!shouldSyncVideo) return
 
@@ -259,14 +270,19 @@ export default function VideoSection() {
       pin: true,
       pinSpacing: true,
       anticipatePin: 1,
+      fastScrollEnd: true,
       invalidateOnRefresh: true,
-      scrub: SCRUB_LAG_SEC,
+      /* true = pas d’inertie scrub : suit le scroll brut, meilleur en rafale molette / trackpad */
+      scrub: true,
       onUpdate: (self) => {
         const p       = self.progress
+        const prevP   = lastPinProgressRef.current
+        const burst   = prevP >= 0 && Math.abs(p - prevP) > SCROLL_BURST_PROGRESS
+        lastPinProgressRef.current = p
+
         const cameraZ = SCROLL_DEPTH * p
 
-        /* Caméra + UI : un seul gsap.set (caméra) ; le reste en style DOM = moins de overhead */
-        gsap.set(camera, { translateZ: cameraZ })
+        camera.style.transform = `translate3d(0,0,${cameraZ}px)`
         title.style.opacity = String(Math.max(0, 1 - p * 5))
         title.style.transform = `translate3d(0,${-p * 50}px,0)`
         label.style.opacity = String(Math.max(0, 1 - p * 6))
@@ -276,7 +292,7 @@ export default function VideoSection() {
           pr.style.transformOrigin = 'left center'
         }
 
-        hydrateAndSyncPlayback(cameraZ, false)
+        hydrateAndSyncPlayback(cameraZ, false, burst)
       },
     })
 
@@ -405,7 +421,8 @@ export default function VideoSection() {
           ref={cameraRef}
           style={{
             transformStyle: 'preserve-3d',
-            transform: 'translateZ(0)',
+            transform: 'translate3d(0,0,0)',
+            willChange: 'transform',
             width: '100%',
             height: '100%',
             position: 'relative',

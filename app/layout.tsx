@@ -1,7 +1,12 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import dynamic from 'next/dynamic'
+import { Inter } from 'next/font/google'
+import { mediaPreconnectOrigins } from '@/data/videos/mediaOrigins'
 import '@/app/globals.scss'
+
+const TunnelVideoWarmup = dynamic(() => import('@/components/videos/TunnelVideoWarmup'), {
+  ssr: false,
+})
 
 const LenisProvider = dynamic(() => import('@/components/ui/LenisProvider'), {
   ssr: false,
@@ -46,16 +51,25 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const mediaOrigins = mediaPreconnectOrigins()
+
   return (
     <html lang="fr" className={inter.variable}>
       <head>
         <link rel="preconnect" href="https://api.fontshare.com" />
+        {mediaOrigins.map((origin) => (
+          <link key={origin} rel="preconnect" href={origin} crossOrigin="anonymous" />
+        ))}
+        {mediaOrigins.map((origin) => (
+          <link key={`dns-${origin}`} rel="dns-prefetch" href={origin} />
+        ))}
         <link
           href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap"
           rel="stylesheet"
         />
       </head>
       <body className="bg-cream text-ink overflow-x-hidden">
+        <TunnelVideoWarmup />
         <div className="grain-overlay" aria-hidden="true" />
 
         <LenisProvider>
