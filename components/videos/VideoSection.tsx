@@ -67,8 +67,14 @@ const TUNNEL: TunnelItem[] = [
 */
 const SCROLL_DEPTH = 7500
 const PIN_DISTANCE = 6
-/** Moins de particules en prod = moins de travail canvas par frame avec le tunnel vidéo */
-const STARFIELD_COUNT = IS_DEV ? 64 : 140
+/** Moins de particules en prod = moins de travail canvas sur la même frame que le tunnel */
+const STARFIELD_COUNT = IS_DEV ? 64 : 88
+
+/** Ne resynchroniser hydrate/play vidéo qu’après ce délai (scroll : opacités restent fluides à chaque frame) */
+const VIDEO_SYNC_MS = 110
+
+/** scrub GSAP : plus bas = moins d’inertie à recalculer, scroll plus réactif */
+const SCRUB_LAG_SEC = 0.22
 
 /** Opacité min. pour commencer à charger la source (évite 20 flux réseau + decode d’un coup) */
 const HYDRATE_OP_THRESHOLD = 0.07
@@ -77,7 +83,7 @@ const PLAY_OP_THRESHOLD = 0.22
 /** Au plus N décodeurs vidéo actifs : garde le scroll et l’UI fluides */
 function maxConcurrentVideos(): number {
   if (typeof window === 'undefined') return 2
-  return window.innerWidth < 768 ? 2 : window.innerWidth < 1200 ? 3 : 4
+  return window.innerWidth < 900 ? 2 : 3
 }
 
 function cardOpacity(aZ: number): number {
@@ -98,6 +104,8 @@ export default function VideoSection() {
   const cardRefs    = useRef<(HTMLDivElement | null)[]>([])
   const videoElRefs = useRef<(HTMLVideoElement | null)[]>([])
   const lastCameraZRef = useRef(0)
+  const lastCardOpRef = useRef<number[]>([])
+  const lastVideoSyncRef = useRef(0)
 
   /* Marge trop grande → ScrollTrigger se monte alors que le portfolio est encore à l’écran (surtout tablette) */
   const nearViewport = useRunWhenNearViewport(sectionRef, '48px')
@@ -121,7 +129,10 @@ export default function VideoSection() {
     if (canvas) {
       canvas.width  = window.innerWidth
       canvas.height = window.innerHeight
-      const ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext('2d', {
+        alpha: true,
+        desynchronized: true,
+      })
       if (ctx) {
         for (let i = 0; i < STARFIELD_COUNT; i++) {
           ctx.beginPath()
@@ -146,23 +157,37 @@ export default function VideoSection() {
     const label   = labelRef.current
     if (!section || !camera || !title || !label) return
 
-    const hydrateAndSyncPlayback = (cameraZ: number) => {
+    const hydrateAndSyncPlayback = (cameraZ: number, forceVideo = false) => {
       lastCameraZRef.current = cameraZ
       const maxPlay = maxConcurrentVideos()
+      const now = typeof performance !== 'undefined' ? performance.now() : 0
+      const lastOps = lastCardOpRef.current
 
       const ops: number[] = []
 
-      cardRefs.current.forEach((card, i) => {
-        if (!card || !TUNNEL[i]) return
-        const aZ = TUNNEL[i].z + cameraZ
+      for (let i = 0; i < TUNNEL.length; i++) {
+        const card = cardRefs.current[i]
+        if (!card) continue
+        const item = TUNNEL[i]
+        const aZ = item.z + cameraZ
         const op = cardOpacity(aZ)
         ops[i] = op
 
-        gsap.set(card, {
-          opacity: op,
-          pointerEvents: op > 0.4 ? 'auto' : 'none',
-        })
-      })
+        const prev = lastOps[i]
+        if (prev === undefined || Math.abs(op - prev) > 0.003) {
+          lastOps[i] = op
+          card.style.opacity = String(op)
+          const pe = op > 0.4 ? 'auto' : 'none'
+          if (card.style.pointerEvents !== pe) card.style.pointerEvents = pe
+        }
+      }
+
+      const shouldSyncVideo =
+        forceVideo || now - lastVideoSyncRef.current >= VIDEO_SYNC_MS
+
+      if (!shouldSyncVideo) return
+
+      lastVideoSyncRef.current = now
 
       for (let i = 0; i < TUNNEL.length; i++) {
         const op = ops[i]
@@ -199,7 +224,7 @@ export default function VideoSection() {
         if (!vis) {
           videoElRefs.current.forEach((v) => v?.pause())
         } else {
-          hydrateAndSyncPlayback(lastCameraZRef.current)
+          hydrateAndSyncPlayback(lastCameraZRef.current, true)
         }
       },
       { threshold: 0, rootMargin: '0px' },
@@ -235,27 +260,23 @@ export default function VideoSection() {
       pinSpacing: true,
       anticipatePin: 1,
       invalidateOnRefresh: true,
-      scrub: 1,
+      scrub: SCRUB_LAG_SEC,
       onUpdate: (self) => {
         const p       = self.progress
         const cameraZ = SCROLL_DEPTH * p
 
-        /* Avance de la caméra en profondeur */
+        /* Caméra + UI : un seul gsap.set (caméra) ; le reste en style DOM = moins de overhead */
         gsap.set(camera, { translateZ: cameraZ })
-
-        /* Disparition progressive du titre */
-        gsap.set(title, { opacity: Math.max(0, 1 - p * 5), y: -p * 50 })
-        gsap.set(label, { opacity: Math.max(0, 1 - p * 6) })
-
-        /* Barre de progression */
-        if (progressRef.current) {
-          gsap.set(progressRef.current, {
-            scaleX: p,
-            transformOrigin: 'left center',
-          })
+        title.style.opacity = String(Math.max(0, 1 - p * 5))
+        title.style.transform = `translate3d(0,${-p * 50}px,0)`
+        label.style.opacity = String(Math.max(0, 1 - p * 6))
+        const pr = progressRef.current
+        if (pr) {
+          pr.style.transform = `scaleX(${p})`
+          pr.style.transformOrigin = 'left center'
         }
 
-        hydrateAndSyncPlayback(cameraZ)
+        hydrateAndSyncPlayback(cameraZ, false)
       },
     })
 
@@ -264,7 +285,7 @@ export default function VideoSection() {
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(refreshST)
-      requestAnimationFrame(() => hydrateAndSyncPlayback(0))
+      requestAnimationFrame(() => hydrateAndSyncPlayback(0, true))
     })
 
     let resizeT: ReturnType<typeof setTimeout>
@@ -427,9 +448,8 @@ export default function VideoSection() {
                     ? `0 18px 48px rgba(0,0,0,0.82),
                       0 0 0 1px rgba(255,255,255,0.07),
                       0 0 36px rgba(${rgb},0.14)`
-                    : `0 28px 75px rgba(0,0,0,0.88),
-                      0 0 0 1px rgba(255,255,255,0.07),
-                      0 0 60px rgba(${rgb},0.18)`,
+                    : `0 22px 48px rgba(0,0,0,0.9),
+                      0 0 0 1px rgba(255,255,255,0.06)`,
                 }}
               >
                 {/* Vidéo lazy — joue uniquement quand la section est dans le viewport */}
