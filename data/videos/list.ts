@@ -12,7 +12,8 @@ export const videos: VideoItem[] = [
     description:
       'Aftermovie officiel du festival Solstice. Captation immersive, montage cinématique et sound design premium.',
     thumbnail: 'https://picsum.photos/seed/vid01/1920/1080',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    videoUrl:
+      'https://op8pkcomddhps9bw.public.blob.vercel-storage.com/octovisuals/sam%20.mp4',
     accent: '#FF6A3D',
     featured: true,
   },
@@ -27,7 +28,8 @@ export const videos: VideoItem[] = [
     description:
       'Teaser visuel pour le set de la DJ Mira au Shelter Berlin. Direction artistique et montage premium.',
     thumbnail: 'https://picsum.photos/seed/vid02/1920/1080',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    videoUrl:
+      'https://op8pkcomddhps9bw.public.blob.vercel-storage.com/octovisuals/devv1%2003.27.38.mp4',
     accent: '#2D4BFF',
     featured: true,
   },
@@ -42,7 +44,8 @@ export const videos: VideoItem[] = [
     description:
       'Film d\'ouverture du club Velvet Paris. Ambiance, atmosphère et direction artistique premium pour le lancement.',
     thumbnail: 'https://picsum.photos/seed/vid03/1920/1080',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    videoUrl:
+      'https://op8pkcomddhps9bw.public.blob.vercel-storage.com/octovisuals/devv2%2003.27.38.mp4',
     accent: '#E7C9A9',
     featured: false,
   },
@@ -57,7 +60,8 @@ export const videos: VideoItem[] = [
     description:
       'Récap vidéo premium de la soirée Underground. Montage dynamique et sound design sur mesure.',
     thumbnail: 'https://picsum.photos/seed/vid04/1920/1080',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    videoUrl:
+      'https://op8pkcomddhps9bw.public.blob.vercel-storage.com/octovisuals/esphar.mp4',
     accent: '#FF6A3D',
     featured: true,
   },
@@ -72,7 +76,8 @@ export const videos: VideoItem[] = [
     description:
       'Visual EP complet pour la sortie du producteur Axiom. Un voyage visuel cinématique en 6 chapitres.',
     thumbnail: 'https://picsum.photos/seed/vid05/1920/1080',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    videoUrl:
+      'https://op8pkcomddhps9bw.public.blob.vercel-storage.com/octovisuals/miaterra.mp4',
     accent: '#2B2B2B',
     featured: true,
   },
@@ -87,7 +92,8 @@ export const videos: VideoItem[] = [
     description:
       'Teaser de session live filmée dans un lieu exceptionnel. Ambiance unique, cinématographie premium.',
     thumbnail: 'https://picsum.photos/seed/vid06/1920/1080',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+    videoUrl:
+      'https://op8pkcomddhps9bw.public.blob.vercel-storage.com/octovisuals/miaterra2.mp4',
     accent: '#FF6A3D',
     featured: true,
   },

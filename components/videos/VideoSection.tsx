@@ -67,7 +67,26 @@ const TUNNEL: TunnelItem[] = [
 */
 const SCROLL_DEPTH = 7500
 const PIN_DISTANCE = 6
-const STARFIELD_COUNT = IS_DEV ? 64 : 220
+/** Moins de particules en prod = moins de travail canvas par frame avec le tunnel vidéo */
+const STARFIELD_COUNT = IS_DEV ? 64 : 140
+
+/** Opacité min. pour commencer à charger la source (évite 20 flux réseau + decode d’un coup) */
+const HYDRATE_OP_THRESHOLD = 0.07
+/** Opacité min. pour être candidat à la lecture */
+const PLAY_OP_THRESHOLD = 0.22
+/** Au plus N décodeurs vidéo actifs : garde le scroll et l’UI fluides */
+function maxConcurrentVideos(): number {
+  if (typeof window === 'undefined') return 2
+  return window.innerWidth < 768 ? 2 : window.innerWidth < 1200 ? 3 : 4
+}
+
+function cardOpacity(aZ: number): number {
+  if (aZ < -3500) return 0
+  if (aZ < -500) return (aZ + 3500) / 3000
+  if (aZ < 200) return 1
+  if (aZ < 900) return Math.max(0, 1 - (aZ - 200) / 700)
+  return 0
+}
 
 export default function VideoSection() {
   const sectionRef  = useRef<HTMLElement>(null)
@@ -78,6 +97,7 @@ export default function VideoSection() {
   const starsRef    = useRef<HTMLCanvasElement>(null)
   const cardRefs    = useRef<(HTMLDivElement | null)[]>([])
   const videoElRefs = useRef<(HTMLVideoElement | null)[]>([])
+  const lastCameraZRef = useRef(0)
 
   /* Marge trop grande → ScrollTrigger se monte alors que le portfolio est encore à l’écran (surtout tablette) */
   const nearViewport = useRunWhenNearViewport(sectionRef, '48px')
@@ -126,16 +146,63 @@ export default function VideoSection() {
     const label   = labelRef.current
     if (!section || !camera || !title || !label) return
 
-    /* ── Lazy video: play only when section is visible ── */
+    const hydrateAndSyncPlayback = (cameraZ: number) => {
+      lastCameraZRef.current = cameraZ
+      const maxPlay = maxConcurrentVideos()
+
+      const ops: number[] = []
+
+      cardRefs.current.forEach((card, i) => {
+        if (!card || !TUNNEL[i]) return
+        const aZ = TUNNEL[i].z + cameraZ
+        const op = cardOpacity(aZ)
+        ops[i] = op
+
+        gsap.set(card, {
+          opacity: op,
+          pointerEvents: op > 0.4 ? 'auto' : 'none',
+        })
+      })
+
+      for (let i = 0; i < TUNNEL.length; i++) {
+        const op = ops[i]
+        if (op === undefined || op < HYDRATE_OP_THRESHOLD) continue
+        const video = videoElRefs.current[i]
+        if (!video || video.dataset.srcReady === '1') continue
+        video.src = videos[TUNNEL[i].vi % videos.length].videoUrl
+        video.load()
+        video.dataset.srcReady = '1'
+      }
+
+      const playSlots = ops
+        .map((op, i) => (op !== undefined && op >= PLAY_OP_THRESHOLD ? { i, op } : null))
+        .filter((x): x is { i: number; op: number } => x !== null)
+        .sort((a, b) => b.op - a.op)
+        .slice(0, maxPlay)
+        .map((x) => x.i)
+
+      const playSet = new Set(playSlots)
+      videoElRefs.current.forEach((video, i) => {
+        if (!video || video.dataset.srcReady !== '1') return
+        if (playSet.has(i)) {
+          if (video.paused) void video.play().catch(() => {})
+        } else if (!video.paused) {
+          video.pause()
+        }
+      })
+    }
+
+    /* Pause tout hors viewport ; pas de “play all” (sature CPU / RAM avec ~20 fichiers) */
     const videoIO = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          videoElRefs.current.forEach((v) => v?.play().catch(() => {}))
-        } else {
+        const vis = entries[0]?.isIntersecting
+        if (!vis) {
           videoElRefs.current.forEach((v) => v?.pause())
+        } else {
+          hydrateAndSyncPlayback(lastCameraZRef.current)
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0, rootMargin: '0px' },
     )
     videoIO.observe(section)
 
@@ -188,36 +255,7 @@ export default function VideoSection() {
           })
         }
 
-        /*
-          Opacité par carte selon la distance absolue à la caméra :
-            aZ < -3500       → invisible (trop loin, pas encore visible)
-            -3500 → -500     → fondu progressif (apparition depuis les profondeurs)
-            -500  → +200     → pleinement visible (zone idéale)
-            +200  → +900     → fondu de sortie (passe devant la caméra)
-            > +900           → invisible (déjà passé)
-        */
-        cardRefs.current.forEach((card, i) => {
-          if (!card || !TUNNEL[i]) return
-          const aZ = TUNNEL[i].z + cameraZ
-          let op: number
-
-          if (aZ < -3500) {
-            op = 0
-          } else if (aZ < -500) {
-            op = (aZ + 3500) / 3000
-          } else if (aZ < 200) {
-            op = 1
-          } else if (aZ < 900) {
-            op = Math.max(0, 1 - (aZ - 200) / 700)
-          } else {
-            op = 0
-          }
-
-          gsap.set(card, {
-            opacity: op,
-            pointerEvents: op > 0.4 ? 'auto' : 'none',
-          })
-        })
+        hydrateAndSyncPlayback(cameraZ)
       },
     })
 
@@ -226,6 +264,7 @@ export default function VideoSection() {
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(refreshST)
+      requestAnimationFrame(() => hydrateAndSyncPlayback(0))
     })
 
     let resizeT: ReturnType<typeof setTimeout>
@@ -240,7 +279,13 @@ export default function VideoSection() {
       clearTimeout(resizeT)
       st.kill()
       videoIO.disconnect()
-      videoElRefs.current.forEach((v) => v?.pause())
+      videoElRefs.current.forEach((v) => {
+        if (!v) return
+        v.pause()
+        v.removeAttribute('src')
+        v.removeAttribute('data-src-ready')
+        v.load()
+      })
     }
   }, [nearViewport])
 
@@ -390,12 +435,14 @@ export default function VideoSection() {
                 {/* Vidéo lazy — joue uniquement quand la section est dans le viewport */}
                 <video
                   ref={(el) => { videoElRefs.current[i] = el }}
-                  src={vid.videoUrl}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  poster={vid.thumbnail}
+                  className="absolute inset-0 h-full w-full object-cover [transform:translateZ(0)]"
                   muted
                   playsInline
                   loop
                   preload="none"
+                  disablePictureInPicture
+                  disableRemotePlayback
                 />
 
                 {/* Dégradé bas */}
