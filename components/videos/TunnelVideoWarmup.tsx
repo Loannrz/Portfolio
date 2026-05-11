@@ -9,7 +9,9 @@ import { videos } from '@/data/videos'
  */
 export default function TunnelVideoWarmup() {
   useEffect(() => {
-    const urls = [...new Set(videos.map((v) => v.videoUrl).filter(Boolean))]
+    const urls = Array.from(
+      new Set(videos.map((v) => v.videoUrl).filter((u): u is string => Boolean(u))),
+    )
 
     const warmOne = (url: string) =>
       new Promise<void>((resolve) => {
