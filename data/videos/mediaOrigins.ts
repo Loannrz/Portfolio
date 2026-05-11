@@ -17,5 +17,5 @@ export function mediaPreconnectOrigins(): string[] {
       /* ignore */
     }
   }
-  return [...o]
+  return Array.from(o)
 }
