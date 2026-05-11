@@ -70,11 +70,20 @@ const PIN_DISTANCE = 6
 /** Moins de particules en prod = moins de travail canvas sur la même frame que le tunnel */
 const STARFIELD_COUNT = IS_DEV ? 64 : 88
 
-/** Sync vidéo « normal » ; en rafale (gros Δprogress) on force à chaque frame */
+/** Sync vidéo « normal » ; en rafale (gros Δprogress) on force repaint cartes */
 const VIDEO_SYNC_MS = 90
 
-/** Si |Δprogress| > seuil entre deux onUpdate : on ignore l’epsilon d’opacité + sync vidéo */
+/** Si |Δprogress| > seuil entre deux onUpdate : repaint cartes + sync vidéo prioritaire */
 const SCROLL_BURST_PROGRESS = 0.017
+
+/** Scroll rapide : |Δp| sur une frame (molette / inertie Lenis) */
+const FAST_SCROLL_DP = 0.011
+
+/** |getVelocity()| ScrollTrigger (px/s) au-delà duquel on coupe la lecture */
+const FAST_SCROLL_VELOCITY = 520
+
+/** Après une rafale, garder le mode léger encore un peu (évite flicker play/pause) */
+const FAST_SCROLL_LINGER_MS = 160
 
 /** Opacité min. pour commencer à charger la source (évite 20 flux réseau + decode d’un coup) */
 const HYDRATE_OP_THRESHOLD = 0.07
@@ -107,6 +116,9 @@ export default function VideoSection() {
   const lastCardOpRef = useRef<number[]>([])
   const lastVideoSyncRef = useRef(0)
   const lastPinProgressRef = useRef<number>(-1)
+  const lastPinTimeRef = useRef(0)
+  const fastScrollUntilRef = useRef(0)
+  const lastLiteVisualRef = useRef(false)
 
   /* Marge trop grande → ScrollTrigger se monte alors que le portfolio est encore à l’écran (surtout tablette) */
   const nearViewport = useRunWhenNearViewport(sectionRef, '48px')
@@ -162,6 +174,7 @@ export default function VideoSection() {
       cameraZ: number,
       forceVideo = false,
       scrollBurst = false,
+      liteScroll = false,
     ) => {
       lastCameraZRef.current = cameraZ
       const maxPlay = maxConcurrentVideos()
@@ -189,6 +202,27 @@ export default function VideoSection() {
           const pe = op > 0.4 ? 'auto' : 'none'
           if (card.style.pointerEvents !== pe) card.style.pointerEvents = pe
         }
+      }
+
+      if (liteScroll !== lastLiteVisualRef.current) {
+        lastLiteVisualRef.current = liteScroll
+        videoElRefs.current.forEach((video) => {
+          if (!video) return
+          if (liteScroll) {
+            video.style.opacity = '0.42'
+            video.style.filter = 'saturate(0.75) blur(1.25px)'
+          } else {
+            video.style.opacity = ''
+            video.style.filter = ''
+          }
+        })
+      }
+
+      if (liteScroll) {
+        videoElRefs.current.forEach((v) => {
+          if (v && !v.paused) v.pause()
+        })
+        return
       }
 
       const shouldSyncVideo =
@@ -235,7 +269,7 @@ export default function VideoSection() {
         if (!vis) {
           videoElRefs.current.forEach((v) => v?.pause())
         } else {
-          hydrateAndSyncPlayback(lastCameraZRef.current, true)
+          hydrateAndSyncPlayback(lastCameraZRef.current, true, false, false)
         }
       },
       { threshold: 0, rootMargin: '0px' },
@@ -275,10 +309,31 @@ export default function VideoSection() {
       /* true = pas d’inertie scrub : suit le scroll brut, meilleur en rafale molette / trackpad */
       scrub: true,
       onUpdate: (self) => {
-        const p       = self.progress
-        const prevP   = lastPinProgressRef.current
-        const burst   = prevP >= 0 && Math.abs(p - prevP) > SCROLL_BURST_PROGRESS
+        const p     = self.progress
+        const prevP = lastPinProgressRef.current
+        const prevT = lastPinTimeRef.current
+        const now   = performance.now()
+        const dt    = prevT > 0 ? Math.max(1, now - prevT) : 16
+        const dp    = prevP >= 0 ? Math.abs(p - prevP) : 0
+
+        const burst = prevP >= 0 && dp > SCROLL_BURST_PROGRESS
+        let vel = 0
+        try {
+          vel = Math.abs(self.getVelocity())
+        } catch {
+          vel = 0
+        }
+        const dpPerMs = dp / dt
+        const spikeFast = dp > FAST_SCROLL_DP || dpPerMs > 0.00075
+        const velFast = vel > FAST_SCROLL_VELOCITY
+
+        if (spikeFast || velFast) {
+          fastScrollUntilRef.current = now + FAST_SCROLL_LINGER_MS
+        }
+        const liteScroll = now < fastScrollUntilRef.current
+
         lastPinProgressRef.current = p
+        lastPinTimeRef.current = now
 
         const cameraZ = SCROLL_DEPTH * p
 
@@ -292,7 +347,7 @@ export default function VideoSection() {
           pr.style.transformOrigin = 'left center'
         }
 
-        hydrateAndSyncPlayback(cameraZ, false, burst)
+        hydrateAndSyncPlayback(cameraZ, false, burst, liteScroll)
       },
     })
 
@@ -301,7 +356,7 @@ export default function VideoSection() {
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(refreshST)
-      requestAnimationFrame(() => hydrateAndSyncPlayback(0, true))
+      requestAnimationFrame(() => hydrateAndSyncPlayback(0, true, false, false))
     })
 
     let resizeT: ReturnType<typeof setTimeout>
@@ -316,8 +371,11 @@ export default function VideoSection() {
       clearTimeout(resizeT)
       st.kill()
       videoIO.disconnect()
+      lastLiteVisualRef.current = false
       videoElRefs.current.forEach((v) => {
         if (!v) return
+        v.style.opacity = ''
+        v.style.filter = ''
         v.pause()
         v.removeAttribute('src')
         v.removeAttribute('data-src-ready')
